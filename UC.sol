@@ -1,13 +1,13 @@
 pragma solidity ^ 0.4.0;
 contract Union {
 	struct DomainInfo {
-		address MCAddr;//Management contract address in the domain
-		string GWPK;//Gateway’s public key
-		address GWAddr;//Gateway address
+		address MCAddr;     //Management contract address in the domain
+		string GWPK;        //Gateway’s public key
+		address GWAddr;     //Gateway address
 	}
-	string public PK;//public key of CA
-	address public owner;//address of creater 
-	address public UC;//this contract's address
+	string public PK;          //public key of CA
+	address public owner;      //address of creater 
+	address public UC;         //this contract's address
 	string[] public domain ;
 	uint public domainNum;
 	constructor(string _PK)public {
@@ -18,7 +18,7 @@ contract Union {
 		domainNum=0;
 	}
 	
-	mapping(string => DomainInfo) DomainList;//map ID => DomainInfo for storing domain list
+	mapping(string => DomainInfo) DomainList;  //map ID => DomainInfo for storing domain list
 
 	
 	event Add_Domain(string _ID, address _MCAddr, string _GWPK, address _GWAddr);
