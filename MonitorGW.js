@@ -26,26 +26,26 @@ Array.prototype.remove = function (val) {
 	}
 };
 
-var contract = async function (file, Addre) {
+var contract = async function (file, Addre) {//creat a contract using ABI file and contract address
 	var data = await readFile(file);
 	js = JSON.parse(data.toString());
 	var UC = new web3.eth.Contract(js.abi, Addre);
 	return UC;
 };
-var events = [];
-var user = [];
+var events = []; //store all events
+var user = [];   //store all routers and clients
 
 var monitor = async function () {
 	let file = path.join(__dirname, 'Management.json');
 	var MC = await contract(file, MCAddr);
 
-	await MC.getPastEvents('allEvents', {
+	await MC.getPastEvents('allEvents', { //get all events untill now
 		fromBlock: 0,
 		toBlock: 'latest'
 	}, async(error, results) => {
-		if (events.length == results.length) {
+		if (events.length == results.length) { //no new events 
 			console.log("No new event");
-		} else {
+		} else {// new events
 			results.splice(0, events.length);
 			for (result of results) {
 				if (result.event == 'RouterADD') {
@@ -96,16 +96,16 @@ var monitor = async function () {
 					console.log('\n');
 				}
 			}
-			events = events.concat(results);
+			events = events.concat(results);// add new events to events[]
 		}
 	});
-	for (u of user) {
+	for (u of user) {//check if all users in the domain is overdue
 		var time = parseInt(new Date().getTime() / 1000);
 		let id32 = await MC.methods.stringToBytes32(u).call();
 		let router = await MC.methods.routerL(id32).call();
 		if (router.register_ack == 0)
 			router = await MC.methods.clientL(id32).call();
-		if (time >= router.Outtime && router.Attr == 0) {
+		if (time >= router.Outtime && router.Attr == 0) {//change all user without expired attribute to expired
 			console.log(u + ' is EXPIRED');
 			MC.methods.Time(u).send({
 				from: R1Addr,
