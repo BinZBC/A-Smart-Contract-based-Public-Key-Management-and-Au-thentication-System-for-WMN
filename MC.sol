@@ -2,11 +2,11 @@ pragma solidity ^ 0.4.22;
 
 contract Management {
 	struct manager {
-		string managerID;//Manager’s identification.
-		string DID;//Domain’s identification.
-		string managerPK;//Manager’s public key.
-		uint T_renew;//Public key update interval.
-		address managerAddr;//Account address of manager.
+		string managerID;             //Manager’s identification.
+		string DID;                   //Domain’s identification.
+		string managerPK;             //Manager’s public key.
+		uint T_renew;                 //Public key update interval.
+		address managerAddr;          //Account address of manager.
 	}
 	manager public Mgr;
 	enum ATTR {
