@@ -33,7 +33,8 @@ var readFile = function (fileName) {
 		});
 	});
 }
-var contract = async function (file, Addre) {
+/*create a smart contract according ABI file and contract address*/
+var contract = async function (file, Addre) { 
 	var data = await readFile(file);
 	js = JSON.parse(data.toString());
 	var UC = new web3.eth.Contract(js.abi, Addre);
@@ -44,22 +45,22 @@ var currentTxHash = "";
 var previousTxHash = "";
 
 async function ACC(_ID, _DID) {
-	var _time = parseInt(new Date().getTime() / 1000);
+	
 	var file = path.join(__dirname, 'Union.json');
-	let UC = await contract(file, UCAddre);
-	let McAddr = (await UC.methods.getMCAddr(_DID).call());
+	let UC = await contract(file, UCAddre);    
+	let McAddr = (await UC.methods.getMCAddr(_DID).call());  //get the mc address of client's domain
 	file = path.join(__dirname, 'Management.json');
-	await web3.eth.personal.unlockAccount(R1Addr, "123", 600000);
 	var MC = await contract(file, McAddr);
-	let ack = (await MC.methods.ViewPK(_ID).call()).ack;
-	if (ack == 0) {
+	await web3.eth.personal.unlockAccount(R1Addr, "123", 600000); 
+	let ack = (await MC.methods.ViewPK(_ID).call()).ack;     //get attribute of client
+	if (ack == 0) {  //Client does not register 
 		console.log("Client " + _ID + " does not exists");
 		return 4;
 	} else {
 		file = path.join(__dirname, 'AccessControl.json');
 		var ACC = await contract(file, AccAddr);
 		var id32 = await ACC.methods.stringToBytes32(_ID).call();
-		let result = await ACC.methods.AccessClientL(id32).call();
+		let result = await ACC.methods.AccessClientL(id32).call(); //get
 		let NoFR = result.NoFR,
 		NoB = parseInt(result.NoB),
 		ToUnB = result.ToUnB;
@@ -67,9 +68,9 @@ async function ACC(_ID, _DID) {
 		let errorcode = 0,
 		res = true;
 		let misbehavior = "";
-		var currentTime = parseInt(new Date().getTime() / 1000);
-		if (ack == 3) {
-			errorcode = 3;
+		var currentTime = parseInt(new Date().getTime() / 1000);//timestamp
+		if (ack == 3) { // Public key is outtime
+			errorcode = 3
 			res = false;
 			misbehavior = "Public key is outtime!";
 			penalty = misbehaviorJudge(NoB);
@@ -77,7 +78,7 @@ async function ACC(_ID, _DID) {
 			ToUnB = currentTime + penalty * 60;
 			NoB += 1;
 		} else {
-			if (!result.isValued) {
+			if (!result.isValued) { //A new client (the client has not connected the router)
 				console.log("Add new client!");
 				await MC.methods.clientCon(_ID).send({
 					from: R1Addr,
@@ -85,7 +86,8 @@ async function ACC(_ID, _DID) {
 				}).then((receipt) => {
 					console.log('clientCon transactionHash: ' + receipt.transactionHash);
 				});
-				await ACC.methods.ACLInite(_DID, _ID, currentTime, errorcode, res).send({
+				//Initialize the AccessClientL list in ACC
+				await ACC.methods.ACLInite(_DID, _ID, currentTime, errorcode, res).send({ 
 					from: R1Addr,
 					gas: 4000000
 				}).then(async(receipt) => {
@@ -107,7 +109,7 @@ async function ACC(_ID, _DID) {
 				return;
 			}
 			if (ToUnB >= currentTime) { //still blocked state
-				errorcode = 1; //"Requests are blocked!"
+				errorcode = 1;   //Requests are blocked
 				res = false;
 				misbehavior = "Requests are blocked!"
 			} else { //unblocked state
@@ -117,9 +119,9 @@ async function ACC(_ID, _DID) {
 				}
 				let time = (await(ACC.methods.getAccessReport(_ID, result.Num - 1).call())).time;
 				console.log('Now: ' + time);
-				if (currentTime - time <= minInterval) {
+				if (currentTime - time <= minInterval) { //frequent access
 					NoFR++;
-					if (NoFR >= ThroFR) {
+					if (NoFR >= ThroFR) { 
 						misbehavior = "Too frequent access!";
 						penalty = misbehaviorJudge(NoB);
 						console.log('penalty: ' + penalty);
@@ -135,7 +137,8 @@ async function ACC(_ID, _DID) {
 				res = false;
 			console.log("Access Reporting!");
 			console.log(_ID, ToUnB, NoFR, currentTime, errorcode, res);
-			let events = await ACC.methods.setACL(_ID, ToUnB, NoFR, currentTime, errorcode, res).send({
+			// set the AccessClientL list in ACC and report the access record
+			await ACC.methods.setACL(_ID, ToUnB, NoFR, currentTime, errorcode, res).send({
 					from: R1Addr,
 					gas: 3000000
 				});
@@ -157,14 +160,14 @@ async function ACC(_ID, _DID) {
 				}
 			}); ;
 		}
-		if (0 == errorcode)
+		if (0 == errorcode) //No misbehavior
 			misbehavior = "Access authorized!";
 		console.log(misbehavior);
-		if (ack == 2) {
+		if (ack == 2) {//Public key is malicious
 			errorcode = 5;
 			console.log("Public key is malicious");
 		}
-		if (penalty > 0) {
+		if (penalty > 0) { //misbehavior occur
 			console.log("Client misbehavior report!");
 			await ACC.methods.misbehaviorRe(_ID, currentTime, misbehavior, penalty).send({
 				from: R1Addr,
@@ -173,7 +176,7 @@ async function ACC(_ID, _DID) {
 				console.log('misbehavior transactionHash: ' + receipt.transactionHash);
 			});
 		}
-		if (NoB >= ThroB) {
+		if (NoB >= ThroB) { //report malicious
 			console.log("Client REV report!");
 			await MC.methods.clientRev(_ID).send({
 				from: R1Addr,
