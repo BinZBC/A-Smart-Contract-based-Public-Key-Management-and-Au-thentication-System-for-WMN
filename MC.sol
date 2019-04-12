@@ -11,7 +11,7 @@ contract Management {
 	manager public Mgr;
 	enum ATTR {
 		registed,
-		malcious,
+		malicious,
 		expired
 	}
 
@@ -37,7 +37,7 @@ contract Management {
 		string routerID;              //Identification of the router adding this client.
 		uint Outtime;                 //Client public key expiration time.
 		uint CoN;                     //Number of connection routers.
-		uint8 malciousRN;             //Number of malicious reports.
+		uint8 maliciousRN;             //Number of malicious reports.
 		ATTR Attr;                    //Node public key attribute.
 	}
 	mapping(string =>mapping(string => bool))routerConL;   //mapping (clienID, routerID) => bool for checking if client connecting router.
@@ -83,6 +83,7 @@ contract Management {
 	}
 /*add the a router to the router list routerL*/
 	function routerAdd(address addr, string _ID, string _pk, address _acc)public {
+	/*the caller must be manager*/
 		require(msg.sender == Mgr.managerAddr);
 		bytes32 _ID32 = stringToBytes32(_ID);
 		require(routerL[_ID32].register_ack == 0);
@@ -101,8 +102,10 @@ contract Management {
 /*accept another registered router*/
 	function Accept(string _ID)public {
 		bytes32 _ID32 = stringToBytes32(_ID);
+		/*the router must have been registered, its attribute must be registed and it is not caller*/
 		require(routerL[_ID32].register_ack == 1 && routerL[_ID32].Attr == ATTR.registed&&routerL[_ID32].routerAddr!=msg.sender);
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
+		/*the caller must have been registered and its attribute must be registed*/
 		require(routerL[_ID132].register_ack == 1 && routerL[_ID132].Attr == ATTR.registed);
 		if (AcceptL[_ID][node[msg.sender]] == false) {
 			routerL[_ID32].acceptNum += 1;
@@ -114,6 +117,7 @@ contract Management {
 /*update public key of a registered router*/
 	function routerUpdate(string pk)public {
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
+		/*the router must have been registered and its attribute must be registed or expired*/
 		require(routerL[_ID132].register_ack == 1 && (routerL[_ID132].Attr == ATTR.registed || routerL[_ID132].Attr == ATTR.expired));
 		routerL[_ID132].routerPK = pk;
 		if (routerL[_ID132].Attr == ATTR.expired)
@@ -125,12 +129,14 @@ contract Management {
 	function Accuse(string _ID)public {
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
 		bytes32 _ID32 = stringToBytes32(_ID);
-		require(routerL[_ID32].register_ack == 1 && (routerL[_ID32].Attr == ATTR.registed || routerL[_ID32].Attr == ATTR.malcious));
-		if (msg.sender == Mgr.managerAddr) {
+		/*the router must have been registered and its attribute must be registed or malicious*/
+		require(routerL[_ID32].register_ack == 1 && (routerL[_ID32].Attr == ATTR.registed || routerL[_ID32].Attr == ATTR.malicious));
+		if (msg.sender == Mgr.managerAddr) {  //case caller is manager, the public key is revoked immediately
 			delete routerL[_ID32];
 			routerNum -= 1;
 			//ML[_ID32].Rev = 1;
 			emit RouterREVOCATE(_ID);
+			/*case caller is registered router, its attribute is registed, and it has not accuse the router*/
 		} else if (routerL[_ID132].register_ack == 1 && routerL[_ID132].Attr == ATTR.registed&&AccL[_ID][node[msg.sender]]==false) {
 			AccL[_ID][node[msg.sender]] = true;
 			ML[_ID32].Acc_num += 1;
@@ -142,7 +148,7 @@ contract Management {
 		bytes32 _ID32 = stringToBytes32(_ID);
 		if(routerNum<4)return;
 		if (ML[_ID32].Acc_num >= routerNum / 2 && ML[_ID32].Acc_num < 2*routerNum/3)
-			routerL[_ID32].Attr = ATTR.malcious;
+			routerL[_ID32].Attr = ATTR.malicious;
 		if (ML[_ID32].Acc_num >= 2 * routerNum / 3 && ML[_ID32].Rev != 1) {
 			delete routerL[_ID32];
 			routerNum -= 1;
@@ -153,22 +159,23 @@ contract Management {
 /*get the public key and attribute of some router or client*/
 	function ViewPK(string _ID)constant public returns(string _pk, uint8 ack) {
 		bytes32 _ID32 = stringToBytes32(_ID);
+		/*the router or the client has not registered*/
 		if (routerL[_ID32].register_ack == 0 && clientL[_ID32].register_ack == 0)
 			return ("", 0);
 		else
-			if (routerL[_ID32].register_ack == 1) {
+			if (routerL[_ID32].register_ack == 1) {  //case router
 				_pk = routerL[_ID32].routerPK;
 				if (routerL[_ID32].Attr == ATTR.registed)
 					ack = 1;
-				else if (routerL[_ID32].Attr == ATTR.malcious)
+				else if (routerL[_ID32].Attr == ATTR.malicious)
 					ack = 2;
 				else
 					ack = 3;
-			} else {
+			} else {  //case client
 				_pk = clientL[_ID32].clientPK;
 				if (clientL[_ID32].Attr == ATTR.registed)
 					ack = 1;
-				else if (clientL[_ID32].Attr == ATTR.malcious)
+				else if (clientL[_ID32].Attr == ATTR.malicious)
 					ack = 2;
 				else
 					ack = 3;
@@ -178,14 +185,16 @@ contract Management {
 	function clientAdd(string _ID, string pk)public {
 		bytes32 _ID32 = stringToBytes32(_ID);
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
+		/*the client must have not been registered*/
 		require(clientL[_ID32].register_ack == 0);
+		/*the caller must have been registered and its attribute must be registed*/
 		require(routerL[_ID132].register_ack == 1 && routerL[_ID132].Attr == ATTR.registed);
 		clientL[_ID32].clientPK = pk;
 		clientL[_ID32].Attr = ATTR.registed;
 		clientL[_ID32].register_ack = 1;
 		clientL[_ID32].routerID = node[msg.sender];
 		clientL[_ID32].Outtime = now + Mgr.T_renew* 1 minutes;
-		clientL[_ID32].malciousRN;
+		clientL[_ID32].maliciousRN;
 		emit ClientADD(_ID, pk);
 		clientNum += 1;
 	}
@@ -193,6 +202,7 @@ contract Management {
 	function clientUpdate(string _ID, string pk)public {
 		bytes32 _ID32 = stringToBytes32(_ID);
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
+		/*the caller must have been registered and its attribute must be registed*/
 		require(routerL[_ID132].register_ack == 1 && routerL[_ID132].Attr == ATTR.registed);
 		clientL[_ID32].clientPK = pk;
 		clientL[_ID32].Attr = ATTR.registed;
@@ -202,21 +212,24 @@ contract Management {
   /*revoke the public key of a registered client */
 	function clientRev(string _ID)public {
 		bytes32 _ID32 = stringToBytes32(_ID);
-		require(clientL[_ID32].register_ack == 1);
+		bytes32 _IDr32 = stringToBytes32(node[msg.sender]);
+		/*the caller and the client must have been registered, the client has connected the the caller */
+		require(clientL[_ID32].register_ack == 1&&routerL[_IDr32].register_ack == 1);
 		require(routerConL[_ID][node[msg.sender]] == true);
-		clientL[_ID32].malciousRN += 1;
-		if (clientL[_ID32].malciousRN > clientL[_ID32].CoN / 2)
-			clientL[_ID32].Attr = ATTR.malcious;
-		if (clientL[_ID32].malciousRN > 2 * clientL[_ID32].CoN / 3) {
+		clientL[_ID32].maliciousRN += 1;
+		if (clientL[_ID32].maliciousRN > clientL[_ID32].CoN / 2)
+			clientL[_ID32].Attr = ATTR.malicious;
+		if (clientL[_ID32].maliciousRN > 2 * clientL[_ID32].CoN / 3) {
 			delete clientL[_ID32];
 			clientNum -= 1;
 			emit ClientREVOCATE(_ID);
 		}
 	}
-/*adds the caller to routerCon list of a client accessing it*/
+/*adds the caller (a router) to routerCon list of a client accessing it*/
 	function clientCon(string _ID)public {
 		bytes32 _ID32 = stringToBytes32(_ID);
 		bytes32 _ID132 = stringToBytes32(node[msg.sender]);
+		/*the caller and the client must have been registered, the client has not connected the the caller */
 		if (routerL[_ID132].register_ack == 1 && clientL[_ID32].register_ack == 1 && routerConL[_ID][node[msg.sender]] == false) {
 			routerConL[_ID][node[msg.sender]] = true;
 			clientL[_ID32].CoN += 1;
@@ -226,16 +239,17 @@ contract Management {
 /*check if the public key of some router or client has expired*/
 	function Time(string _ID)public returns(uint256) {
 		bytes32 _ID32 = stringToBytes32(_ID);
+		/*the router or client must have been registered*/
 		require(routerL[_ID32].register_ack == 1 || clientL[_ID32].register_ack == 1);
-
+		/*case  router*/
 		if (routerL[_ID32].register_ack == 1) {
-			if (now >= routerL[_ID32].Outtime) {
-				if (routerL[_ID32].Attr == ATTR.registed)
+			if (now >= routerL[_ID32].Outtime) {   //expired
+				if (routerL[_ID32].Attr == ATTR.registed) //only registed router can change to expired
 					routerL[_ID32].Attr = ATTR.expired;
 				string memory pk = routerL[_ID32].routerPK;
 				emit RouterEXPIRED(_ID, pk);
 			}
-		} else {
+		} else {    //case client similar to router
 			if (now >= clientL[_ID32].Outtime) {
 				if (clientL[_ID32].Attr == ATTR.registed)
 					clientL[_ID32].Attr = ATTR.expired;
@@ -251,7 +265,6 @@ contract Management {
     if (tempEmptyStringTest.length == 0) {
         return 0x0;
     }
-
     assembly {
         result := mload(add(source, 32))
     }
