@@ -18,27 +18,27 @@ var readFile = function (fileName) {
 	});
 }
 
-var contract = async function (file, Addre) {
+var contract = async function (file, Addre) {//create a contract using ABI file and contract address
 	var data = await readFile(file);
 	js = JSON.parse(data.toString());
 	var UC = new web3.eth.Contract(js.abi, Addre);
 	return UC;
 };
 
-var events = [[], []];
+var events = [[], []];//store all events in all domian
 var UC;
-var innit = async function () {
+var innit = async function () { //create the UC 
 	UC = await contract(file, UCAddr);
 }
 innit();
 
 var domainNum = 0;
-var MC = [];
-var DID = [];
+var MC = [];//store all domain MC
+var DID = []; //store all domain ID
 var monitor = async function () {
 	let domainNum1 = await UC.methods.domainNum().call();
 	file = path.join(__dirname, 'Management.json');
-	if (domainNum1 != domainNum)
+	if (domainNum1 != domainNum) //new domain 
 		for (let i = domainNum; i < domainNum1; i++) {
 			DID.push(await UC.methods.domain(i).call());
 			let McAddr = (await UC.methods.getMCAddr(DID[i]).call());
@@ -46,7 +46,7 @@ var monitor = async function () {
 		}
 	domainNum = domainNum1;
 	
-	for (let i = 0; i < domainNum; i++) {
+	for (let i = 0; i < domainNum; i++) {//Iterate through all the domain
 		await MC[i].getPastEvents('allEvents', {
 			fromBlock: 0,
 			toBlock: 'latest'
@@ -54,7 +54,7 @@ var monitor = async function () {
 			console.log(events[i].length);
 			if (events[i].length == results.length) {
 				console.log("No new event");
-			} else {
+			} else {//new events occur 
 				results.splice(0, events[i].length); 
 				for (result of results) {
 					if (result.event == 'RouterADD') {
@@ -110,7 +110,7 @@ var monitor = async function () {
 						console.log('\n');
 					}
 				}
-				events[i] = events[i].concat(results);
+				events[i] = events[i].concat(results);//add new events to events
 			}
 		}); ;
 	}
@@ -119,4 +119,5 @@ var monitor = async function () {
 
 
 var CronJob = require('cron').CronJob;
+/*checke events every 30s*/
 new CronJob('*/30 * * * * *', monitor, null, true, 'America/Los_Angeles');
